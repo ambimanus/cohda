@@ -2,18 +2,11 @@
 
 from __future__ import division
 
-import os
-import csv
-import gzip
-from datetime import datetime
-
 import numpy as np
 
 from definitions import *
-from util import (import_object, current_method, locdict, norm, base10toN,
-                  resample)
+from util import import_object, current_method, locdict, base10toN
 from objectives import *
-import stigspace
 
 
 # [Han, 2009] eq. (13)-(16),(20)-(24)

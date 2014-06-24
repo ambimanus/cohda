@@ -52,7 +52,6 @@ def setup_logger(cfg, basepath='../data', makedir=True, lvl=LOG_LEVEL):
 
     globals()['cfg.log_to_file'] = cfg.log_to_file
     if cfg.log_to_file:
-        assert cfg != None
 
         if makedir:
             ts = datetime.datetime.now().isoformat().split('T')[0]
