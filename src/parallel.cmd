@@ -1,2 +1,3 @@
+
 # GNU parallel:
-seq 10000 | parallel "python hero.py"
+seq $(python parallel.py count) | parallel "python parallel.py"

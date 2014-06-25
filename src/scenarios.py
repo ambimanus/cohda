@@ -168,6 +168,9 @@ def SC(rnd, seed,
     opt_w_ranges = np.array([np.min(np.min(opt_w, 1), 1),
                              np.max(np.max(opt_w, 1), 1)]).T
 
+    if opt_h == 'random':
+        opt_h = int(round(rnd.uniform(1, opt_s)))
+
     objective = import_object(objective_module, objective_type)(
             np.array([_capacity(i, opt_h, opt_s, opt_m, opt_w)
                     for i in range(1, opt_q + 1)]))

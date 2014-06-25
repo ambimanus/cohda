@@ -111,7 +111,7 @@ if __name__ == '__main__':
     #         }
     #         params.append((scenario, cfg_dict, sc_dict))
 
-    # for phi in (0.1, 0.5, 1.0, 2.0, 4.0):
+    # for phi in (0.0, 0.1, 0.5, 1.0, 2.0, 4.0):
     #     for seed in range(runs):
     #         scenario = 'SC'
     #         cfg_dict = {
@@ -122,27 +122,27 @@ if __name__ == '__main__':
     #             'agent_delay_max': 0,
     #         }
     #         sc_dict = {
-    #             KW_TITLE: 'SC,phi-%.1f' % phi,
-    #             'opt_h': 5,
+    #             KW_TITLE: 'SC,h-rnd,phi-%.1f' % phi,
+    #             'opt_h': 'random',
     #             'network_phi': phi,
     #         }
     #         params.append((scenario, cfg_dict, sc_dict))
 
-    # for msgdelay in range(1, 11):
-    #     for seed in range(runs):
-    #         scenario = 'SC'
-    #         cfg_dict = {
-    #             'seed': seed,
-    #             'msg_delay_min': 0,
-    #             'msg_delay_max': msgdelay,
-    #             'agent_delay_min': 0,
-    #             'agent_delay_max': 0,
-    #         }
-    #         sc_dict = {
-    #             KW_TITLE: 'SC,msgdelay-%02d' % msgdelay,
-    #             'opt_h': 5,
-    #         }
-    #         params.append((scenario, cfg_dict, sc_dict))
+    for msgdelay in range(1, 11):
+        for seed in range(runs):
+            scenario = 'SC'
+            cfg_dict = {
+                'seed': seed,
+                'msg_delay_min': 0,
+                'msg_delay_max': msgdelay,
+                'agent_delay_min': 0,
+                'agent_delay_max': 0,
+            }
+            sc_dict = {
+                KW_TITLE: 'SC,h-rnd,msgdelay-%02d' % msgdelay,
+                'opt_h': 'random',
+            }
+            params.append((scenario, cfg_dict, sc_dict))
 
     # for agentdelay in range(1, 11):
     #     for seed in range(runs):
@@ -155,8 +155,8 @@ if __name__ == '__main__':
     #             'agent_delay_max': agentdelay,
     #         }
     #         sc_dict = {
-    #             KW_TITLE: 'SC,agentdelay-%02d' % agentdelay,
-    #             'opt_h': 5,
+    #             KW_TITLE: 'SC,h-rnd,agentdelay-%02d' % agentdelay,
+    #             'opt_h': 'random',
     #         }
     #         params.append((scenario, cfg_dict, sc_dict))
 
@@ -254,22 +254,6 @@ if __name__ == '__main__':
     #         'opt_q': 96,
     #     }
     #     params.append((scenario, cfg_dict, sc_dict))
-
-    for h in range(1, 101):
-        for seed in range(runs):
-            scenario = 'SC'
-            cfg_dict = {
-                'seed': seed,
-                'msg_delay_min': 0,
-                'msg_delay_max': 0,
-                'agent_delay_min': 0,
-                'agent_delay_max': 0,
-            }
-            sc_dict = {
-                KW_TITLE: 'SC,h%03d' % h,
-                'opt_h': h,
-            }
-            params.append((scenario, cfg_dict, sc_dict))
 
 
     if 'SGE_TASK_ID' in os.environ:

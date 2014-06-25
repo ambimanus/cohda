@@ -1,6 +1,5 @@
 # coding=utf-8
 
-import logging
 from datetime import datetime as dt
 
 from definitions import *
@@ -36,32 +35,43 @@ class Simulator(object):
         ts = dt.now()
         progress = None
         counter = 0
+        amount = self.sc[KW_OPT_M] + len(self.messages)
 
         # transfer messages
-        for receiver, msg in self.messages:
-            self.agents[receiver].update(msg)
+        delayed_messages = []
+        for delay, msg in self.messages:
+            if delay <= 1:
+                self.agents[msg[0]].update(msg[1])
+            else:
+                delayed_messages.append((delay - 1, msg))
             counter += 1
             if progress is None and (dt.now() - ts).seconds >= 1:
-                progress = PBar(self.sc[KW_OPT_M] + len(self.messages)).start()
+                progress = PBar(amount).start()
             if progress is not None:
                 progress.update(counter)
-        self.messages = []
+        self.messages = delayed_messages
 
         # activate agents
         for a in self.agents.values():
             a.step()
             counter += 1
             if progress is None and (dt.now() - ts).seconds >= 1:
-                progress = PBar(self.sc[KW_OPT_M] + len(self.messages)).start()
+                progress = PBar(amount).start()
             if progress is not None:
                 progress.update(counter)
         self.current_time += 1
 
 
+    def msgdelay(self):
+        return self.cfg.rnd.randint(self.cfg.msg_delay_min,
+                                    self.cfg.msg_delay_max)
+
+
     def msg(self, sender, receiver, msg):
         msg_counter()
-        MSG('a%d ---> a%d' % (sender, receiver))
-        self.messages.append((receiver, msg))
+        delay = self.msgdelay()
+        MSG('a%d --(%d)--> a%d' % (sender, delay, receiver))
+        self.messages.append((delay, (receiver, msg)))
 
 
     def is_active(self):

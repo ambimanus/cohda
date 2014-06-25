@@ -40,7 +40,7 @@ class Agent():
         self.sim = sim
 
     def step(self):
-        if self.current_timeout <= 0:
+        if self.current_timeout <= 1:
             # become active
             if self.objective is not None and self.dirty:
                 AGENT(self.aid, 'entering run()')

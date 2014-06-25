@@ -16,12 +16,16 @@ class Configuration(object):
                  log_to_file=False,
                  rng_seed_max=2**30,
                  max_simulation_steps=None,
-                 msg_delay_min=0,
+                 msg_delay_min=None,
                  msg_delay_max=2,
-                 agent_delay_min=1,
+                 agent_delay_min=None,
                  agent_delay_max=5,
                  random_speaker=True):
         self.rnd = random.Random(seed)
+        self.msg_delay_min = max(1, self.msg_delay_min)
+        self.msg_delay_max = max(self.msg_delay_min, self.msg_delay_max)
+        self.agent_delay_min = max(1, self.agent_delay_min)
+        self.agent_delay_max = max(self.agent_delay_min, self.agent_delay_max)
 
 
 if __name__ == '__main__':

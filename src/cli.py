@@ -70,13 +70,13 @@ def run(cfg):
 if __name__ == '__main__':
     cfg = Configuration(
         seed=0,
-        msg_delay_min=0,
-        msg_delay_max=0,
-        agent_delay_min=0,
-        agent_delay_max=0,
+        msg_delay_min=None,
+        msg_delay_max=None,
+        agent_delay_min=None,
+        agent_delay_max=None,
         log_to_file=False,
     )
-    sc = scenarios.SC(cfg.rnd, cfg.seed, opt_h=5)
+    sc = scenarios.SC(cfg.rnd, cfg.seed, opt_h='random')
     # sc = scenarios.SVSM(cfg.rnd, cfg.seed)
     # sc = scenarios.CHP(cfg.rnd, cfg.seed, opt_m=10, opt_n=400, opt_q=16, opt_q_constant=20.0)
     #
