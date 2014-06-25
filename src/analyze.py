@@ -1450,13 +1450,13 @@ if __name__ == '__main__':
 
     # # -------------------------------------------------------------------------
     # # msgdelay
-    # # python analyze.py ../data/2014-06-24_SC,h-rnd,msgdelay/*
+    # # python analyze.py ../data/2014-06-25_SC,h-rnd,msgdelay/*
     # x = range(1, len(st) + 1)
     # names = ['%d' % d for d in x]
     # fig, ax = plt.subplots(nrows=3, ncols=1, sharex=True)
     # fig.subplots_adjust(left=0.12, right=0.97, top=0.97, bottom=0.09)
     # xloc = FixedLocator(x)
-    # boxplot(ax[0], bkc, names, '', 'Error', ylim=(-0.0001, 0.01))
+    # boxplot(ax[0], bkc, names, '', 'Error', ylim=(-0.0003, 0.02))
     # boxplot(ax[1], sim_steps, names, '', 'Simulation steps', ylabelpad=14)
     # boxplot(ax[2], messages, names, 'Communication delay $d_{\mathrm{max}}$', 'Messages', ylabelpad=14)
 
@@ -1467,7 +1467,7 @@ if __name__ == '__main__':
     # names = ['%d' % d for d in x]
     # fig, ax = plt.subplots(nrows=3, ncols=1, sharex=True)
     # fig.subplots_adjust(left=0.12, right=0.97, top=0.97, bottom=0.09)
-    # boxplot(ax[0], bkc, names, '', 'Error', ylim=(-0.0001, 0.01))
+    # boxplot(ax[0], bkc, names, '', 'Error', ylim=(-0.0003, 0.02))
     # boxplot(ax[1], sim_steps, names, '', 'Simulation steps', ylabelpad=14)
     # boxplot(ax[2], messages, names, 'Reaction delay $r_{\mathrm{max}}$', 'Messages', ylabelpad=14)
 
@@ -1495,7 +1495,7 @@ if __name__ == '__main__':
 
     # # -------------------------------------------------------------------------
     # # msgdelay
-    # # python analyze.py ../data/2013-11-02_SC,msgdelay/*
+    # # python analyze.py ../data/2014-06-25_SC,h-rnd,msgdelay/*
     # x = np.arange(1, len(st) + 1)
     # r_sim_steps = fitting_plot(ax00, x, sim_steps, '', 'Simulation steps', tests, xlim=(x[0], x[-1]))
     # r_messages = fitting_plot(ax10, x, messages, 'Communication delay $d_{\mathrm{max}}$', 'Messages', tests)
@@ -1505,7 +1505,7 @@ if __name__ == '__main__':
 
     # # -------------------------------------------------------------------------
     # # agentdelay
-    # # python analyze.py ../data/2013-11-02_SC,agentdelay/2013-11-0*
+    # # python analyze.py ../data/2014-06-24_SC,h-rnd,agentdelay/*
     # x = np.arange(1, len(st) + 1)
     # r_sim_steps = fitting_plot(ax00, x, sim_steps, '', 'Simulation steps', tests, xlim=(x[0], x[-1]))
     # r_messages = fitting_plot(ax10, x, messages, 'Reaction delay $r_{\mathrm{max}}$', 'Messages', tests)
