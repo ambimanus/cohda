@@ -45,7 +45,7 @@ class Agent():
             if self.objective is not None and self.dirty:
                 AGENT(self.aid, 'entering run()')
                 self.run()
-            # else:
+            else:
                 AGENT(self.aid, 'no run() required, going to sleep now.')
             # reset wait counter
             self.current_timeout = self.timeout

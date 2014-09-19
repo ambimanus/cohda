@@ -66,6 +66,8 @@ def run(cfg):
     # Store cfg again, this time with simulation result
     store_cfg(cfg, overwrite=True)
 
+    return stats
+
 
 if __name__ == '__main__':
     cfg = Configuration(

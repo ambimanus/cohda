@@ -2,6 +2,10 @@
 
 from __future__ import division
 
+import os
+import csv
+from datetime import datetime
+
 import numpy as np
 
 from definitions import *
@@ -227,6 +231,144 @@ def SC(rnd, seed,
     return locdict(locals())
 
 
+def _read_slp_2010(sc, bd):
+    # Read csv data
+    slp = []
+    found = False
+    with open(sc.slp_file, 'r') as f:
+        reader = csv.reader(f, delimiter=';')
+        for row in reader:
+            if not row:
+                continue
+            if not found and row[0] == 'Datum':
+                found = True
+            elif found:
+                date = datetime.strptime('_'.join(row[:2]), '%d.%m.%Y_%H:%M:%S')
+                if date < sc.t_start:
+                    continue
+                elif date >= sc.t_end:
+                    break
+                # This is a demand, so negate the values
+                slp.append(-1.0 * float(row[2].replace(',', '.')))
+    slp = np.array(slp)
+    # Scale values
+    # if hasattr(sc, 'run_unctrl_datafile'):
+    #     slp_norm = norm(slp.min(), slp.max(), slp)
+    #     unctrl = np.load(os.path.join(bd, sc.run_unctrl_datafile)).sum(0) / 1000
+    #     slp = slp_norm * (unctrl.max() - unctrl.min()) + unctrl.min()
+    MS_day_mean = 13.6 * 1000 * 1000    # kWh, derived from SmartNord Scenario document
+    MS_15_mean = MS_day_mean / 96
+    slp = slp / np.abs(slp.mean()) * MS_15_mean
+
+    return slp
+    # return np.array(np.roll(slp, 224, axis=0))
+
+
+def _bounds_spreadreduce_slp(opt_w, objective, zerobound=True, initialbound=True):
+    assert zerobound
+    assert type(objective) == Objective_Spreadreduce_SLP
+    if initialbound:
+        return objective(objective.sol_init), 0, None
+    else:
+        diffs = opt_w - objective.sol_init
+        max_diff_spread = np.sum(np.max(diffs, 1) - np.min(diffs, 1), 0)
+        return objective(max_diff_spread), 0, None
+
+
+def APPSIM_ENUM(rnd, appsim_scenario, basedir,
+         agent_module='agent',
+         agent_type='Agent',
+         agent_arp=False,
+         network_module='networks',
+         network_type='smallworld',
+         network_c=3,
+         network_k=1,
+         network_phi=0.5,
+         objective_module='objectives',
+         objective_type='Objective_Manhattan',
+         opt_sol_init_type='given',      # initial solution: random, worst or given?
+         opt_p_refuse_type='constant',   # p_refuse: constant, random, sc?
+         opt_p_refuse_min=0.0,           # p_refuse: minimal value
+         opt_p_refuse_max=0.0,           # p_refuse: maximal value
+         ):
+    np.random.seed(appsim_scenario.seed)
+    scenario_module, scenario_type = current_method()
+
+    title = appsim_scenario.title
+    opt_m = sum([d[1] for d in appsim_scenario.device_templates])
+    opt_w = np.load(os.path.join(basedir, appsim_scenario.run_pre_samplesfile))
+    opt_w_ranges = np.array([np.min(np.min(opt_w, 2), 1),
+                             np.max(np.max(opt_w, 2), 1)]).T
+    opt_q = opt_w.shape[-1]
+
+    b_start = appsim_scenario.t_block_start
+    b_end = appsim_scenario.t_block_end
+    div = 1
+    if (b_end - b_start).total_seconds() / 60 == opt_q * 15:
+        div = 15
+    b_s = (b_start - appsim_scenario.t_start).total_seconds() / 60 / div
+    b_e = (b_end - appsim_scenario.t_start).total_seconds() / 60 / div
+
+    if opt_p_refuse_type == 'constant':
+        opt_p_refuse = [opt_p_refuse_max for i in range(opt_m)]
+    elif opt_p_refuse_type == 'random':
+        opt_p_refuse = [rnd.uniform(opt_p_refuse_min, opt_p_refuse_max)
+                        for i in range(opt_m)]
+    else:
+        raise RuntimeError(opt_p_refuse_type)
+
+    if opt_sol_init_type == 'random':
+        sol_init = opt_w[np.arange(opt_m),
+                [rnd.randint(0, opt_n - 1) for i in range(opt_m)]]
+    elif opt_sol_init_type == 'worst':
+        sol_init = opt_w[np.arange(opt_m), sol_j_max]
+    elif opt_sol_init_type == 'given':
+        unctrl = np.load(os.path.join(basedir,
+                                      appsim_scenario.run_unctrl_datafile))
+        unctrl = unctrl[:,0,b_s:b_e]
+        if unctrl.shape[-1] == opt_q:
+            sol_init = unctrl
+        elif unctrl.shape[-1] / 15 == opt_q:
+            sol_init = np.array([resample(i, 15) for i in unctrl])
+        else:
+            raise RuntimeError('cannot match shape of sol_init and target')
+    else:
+        raise RuntimeError(opt_sol_init_type)
+
+    if appsim_scenario.objective == 'epex':
+        block = np.array(appsim_scenario.block)
+        if block.shape == (1,):
+            block = block.repeat(opt_q)
+        elif block.shape[0] == opt_q / 15:
+            block = block.repeat(15)
+        objective = Objective_Manhattan(block)
+        sol_d_max, sol_d_min, sol_j_max = _bounds(opt_w, opt_m, objective,
+                                                  zerobound=True)
+    elif appsim_scenario.objective == 'peakshaving':
+        objective = Objective_Peakshaving((opt_q,))
+        sol_d_max, sol_d_min, sol_j_max = _bounds_peakshaving(opt_w, objective)
+    elif appsim_scenario.objective == 'valleyfilling':
+        objective = Objective_Valleyfilling((opt_q,))
+        sol_d_max, sol_d_min, sol_j_max = _bounds_valleyfilling(opt_w, objective)
+    elif appsim_scenario.objective == 'spreadreduce':
+        objective = Objective_Spreadreduce((opt_q,))
+        sol_d_max, sol_d_min, sol_j_max = _bounds_spreadreduce(opt_w, objective)
+    elif appsim_scenario.objective == 'spreadreduce-slp':
+        slp = _read_slp_2010(appsim_scenario, basedir)[b_s:b_e]
+        objective = Objective_Spreadreduce_SLP(slp, sol_init.sum(0))
+        sol_d_max, sol_d_min, sol_j_max = _bounds_spreadreduce_slp(opt_w, objective)
+    else:
+        raise RuntimeError(appsim_scenario.objective)
+
+    sol_d_avg = _sol_avg(rnd, opt_w, opt_m, objective)
+
+    agent_ids = [i for i in range(opt_m)]
+    network = import_object(network_module, network_type)(locals())
+
+    del rnd, i, b_start, b_end, unctrl, b_s, b_e
+    return locdict(locals())
+
+
 def ids(m, n):
     l = np.zeros(m, dtype=np.int32)
     yield l
@@ -310,7 +452,6 @@ if __name__ == '__main__':
     import random
     seed = 0
     sc = SC(random.Random(seed), seed)
-    # sc = SVSM(random.Random(seed), seed, opt_w_type='HP')
 
     print sc
     # print

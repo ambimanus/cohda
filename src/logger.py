@@ -35,8 +35,13 @@ FILTER_LVL = None
 #FILTER_LVL = _LVL_SOLUTION
 
 
-def setup_logger(cfg, basepath='../data', makedir=True, lvl=LOG_LEVEL):
+def setup_logger(cfg, makedir=True, lvl=LOG_LEVEL):
     from util import get_repo_revision
+
+    if hasattr(cfg, 'basepath'):
+        basepath = cfg.basepath
+    else:
+        basepath = '../data'
 
     if not '_logger' in globals():
         logging.addLevelName(_LVL_MSG, _LVL_MSG_NAME)

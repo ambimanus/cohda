@@ -14,6 +14,7 @@ class Configuration(object):
     def __init__(self,
                  seed=0,
                  log_to_file=False,
+                 basepath='../data',
                  rng_seed_max=2**30,
                  max_simulation_steps=None,
                  msg_delay_min=None,
