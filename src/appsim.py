@@ -71,7 +71,7 @@ if __name__ == '__main__':
     s = Scenario()
     s.load_JSON(sc_file)
 
-    dfn = str(os.path.join(basedir, '.'.join((str(s.seed), 'cohda', 'npy'))))
+    dfn = str(os.path.join(basedir, '.'.join((str(s.seed), 'cohda', 'npz'))))
     if os.path.exists(dfn):
         raise RuntimeError('File already exists: %s' % dfn)
 
@@ -82,9 +82,9 @@ if __name__ == '__main__':
 
     opt_q = int((s.t_block_end - s.t_block_start).total_seconds() / 60)
     if opt_q == 0:
-        opt_m = sum([d[1] for d in s.device_templates])
-        result = np.zeros((opt_m, opt_q))
-        np.save(dfn, result)
+        opt_m = len(s.aids)
+        result = {s.aids[i]: np.zeros(opt_q) for i in range(len(s.aids))}
+        np.savez(dfn, **result)
         s.sched_file = os.path.basename(dfn)
         s.save_JSON(sc_file)
         sys.exit(0)
@@ -99,8 +99,6 @@ if __name__ == '__main__':
     stats = cli.run(cfg)
 
 
-    solution = stats.solution
-    result = np.array([solution[i] for i in sorted(solution.keys())])
-    np.save(dfn, result)
+    np.savez(dfn, **stats.solution)
     s.sched_file = os.path.basename(dfn)
     s.save_JSON(sc_file)

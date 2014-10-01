@@ -134,7 +134,7 @@ class Agent():
 
         # AgentGossipBKC
         bkc_f = self.objective(np.array(bkc.values()))
-        AGENTV(self.aid, 'from %s: f(bkc_%d)' % (aid, bkc_creator))
+        AGENTV(self.aid, 'from %s: f(bkc_%s)' % (aid, bkc_creator))
 
         # For bkc vs. self.bkc, there are different cases to consider:
         # 1) given bkc is created by myself

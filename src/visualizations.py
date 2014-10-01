@@ -112,7 +112,10 @@ class Stats(object):
         if self.first_time:
             self.time_delta = current_time - 1
             INFO(' time |  distance | bkc-value | bkc-size | bkc-dist')
-            sol = self.sc[KW_SOL_INIT].reshape((opt_m, opt_q))
+            if KW_SOL_INIT_DICT in self.sc:
+                sol = np.array(self.sc[KW_SOL_INIT_DICT].values())
+            else:
+                sol = self.sc[KW_SOL_INIT].reshape((opt_m, opt_q))
             SOLUTION('%5.1f' % 0.0,
                      '% .6f |' % util.norm(d_min, d_max,
                                            obj(sol, record_call=False)),

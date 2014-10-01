@@ -31,12 +31,21 @@ def run(cfg):
     INFO('Creating', sc[KW_OPT_M], 'agents of type', sc[KW_AGENT_TYPE])
     agents = dict()
     Agent = import_object(sc[KW_AGENT_MODULE], sc[KW_AGENT_TYPE])
-    for i in range(sc[KW_OPT_M]):
-        aid = int(sc[KW_AGENT_IDS][i])
+    for i, aid in enumerate(sc[KW_AGENT_IDS]):
         # Determine seed for MOCOMixin
         seed = cfg.rnd.randint(0, cfg.rng_seed_max)
+        # Get weights
+        if KW_OPT_W_DICT in sc:
+            w = sc[KW_OPT_W_DICT][aid]
+        else:
+            w = sc[KW_OPT_W][i]
+        # Get sol_init
+        if KW_SOL_INIT_DICT in sc:
+            sol_init = sc[KW_SOL_INIT_DICT][aid]
+        else:
+            sol_init = sc[KW_SOL_INIT][i]
         # Start agent process
-        a = Agent(aid, sc[KW_OPT_W][i], sc[KW_SOL_INIT][i],
+        a = Agent(aid, w, sol_init,
             cfg.rnd.randint(cfg.agent_delay_min, cfg.agent_delay_max),
             seed, sc[KW_OPT_P_REFUSE][i])
         if 'Stigspace' in sc[KW_AGENT_TYPE]:

@@ -295,8 +295,9 @@ def APPSIM_ENUM(rnd, appsim_scenario, basedir,
     scenario_module, scenario_type = current_method()
 
     title = appsim_scenario.title
-    opt_m = sum([d[1] for d in appsim_scenario.device_templates])
-    opt_w = np.load(os.path.join(basedir, appsim_scenario.run_pre_samplesfile))
+    opt_m = len(appsim_scenario.aids)
+    opt_w_dict = dict(np.load(os.path.join(basedir, appsim_scenario.run_pre_samplesfile)))
+    opt_w = np.array([opt_w_dict[aid] for aid in appsim_scenario.aids])
     opt_w_ranges = np.array([np.min(np.min(opt_w, 2), 1),
                              np.max(np.max(opt_w, 2), 1)]).T
     opt_q = opt_w.shape[-1]
@@ -318,20 +319,20 @@ def APPSIM_ENUM(rnd, appsim_scenario, basedir,
         raise RuntimeError(opt_p_refuse_type)
 
     if opt_sol_init_type == 'random':
-        sol_init = opt_w[np.arange(opt_m),
-                [rnd.randint(0, opt_n - 1) for i in range(opt_m)]]
-    elif opt_sol_init_type == 'worst':
-        sol_init = opt_w[np.arange(opt_m), sol_j_max]
+        sol_init_dict = {aid: opt_w_dict[rnd.randint(0, opt_n - 1)]
+                         for aid in appsim_scenario.aids}
     elif opt_sol_init_type == 'given':
         unctrl = np.load(os.path.join(basedir,
                                       appsim_scenario.run_unctrl_datafile))
-        unctrl = unctrl[:,0,b_s:b_e]
-        if unctrl.shape[-1] == opt_q:
-            sol_init = unctrl
-        elif unctrl.shape[-1] / 15 == opt_q:
-            sol_init = np.array([resample(i, 15) for i in unctrl])
-        else:
-            raise RuntimeError('cannot match shape of sol_init and target')
+        sol_init_dict = {}
+        for aid in appsim_scenario.aids:
+            data = unctrl[aid][0,b_s:b_e]
+            if data.shape[-1] == opt_q:
+                sol_init_dict[aid] = data
+            else:
+                raise RuntimeError('cannot match shape of sol_init and target')
+            del data
+        del unctrl
     else:
         raise RuntimeError(opt_sol_init_type)
 
@@ -342,31 +343,35 @@ def APPSIM_ENUM(rnd, appsim_scenario, basedir,
         elif block.shape[0] == opt_q / 15:
             block = block.repeat(15)
         objective = Objective_Manhattan(block)
-        sol_d_max, sol_d_min, sol_j_max = _bounds(opt_w, opt_m, objective,
-                                                  zerobound=True)
+        sol_d_max, sol_d_min, _ = _bounds(opt_w, opt_m, objective,
+                                        zerobound=True)
     elif appsim_scenario.objective == 'peakshaving':
         objective = Objective_Peakshaving((opt_q,))
-        sol_d_max, sol_d_min, sol_j_max = _bounds_peakshaving(opt_w, objective)
+        sol_d_max, sol_d_min, _ = _bounds_peakshaving(opt_w, objective)
     elif appsim_scenario.objective == 'valleyfilling':
         objective = Objective_Valleyfilling((opt_q,))
-        sol_d_max, sol_d_min, sol_j_max = _bounds_valleyfilling(opt_w, objective)
+        sol_d_max, sol_d_min, _ = _bounds_valleyfilling(opt_w, objective)
     elif appsim_scenario.objective == 'spreadreduce':
         objective = Objective_Spreadreduce((opt_q,))
-        sol_d_max, sol_d_min, sol_j_max = _bounds_spreadreduce(opt_w, objective)
+        sol_d_max, sol_d_min, _ = _bounds_spreadreduce(opt_w, objective)
     elif appsim_scenario.objective == 'spreadreduce-slp':
         slp = _read_slp_2010(appsim_scenario, basedir)[b_s:b_e]
         objective = Objective_Spreadreduce_SLP(slp, sol_init.sum(0))
-        sol_d_max, sol_d_min, sol_j_max = _bounds_spreadreduce_slp(opt_w, objective)
+        sol_d_max, sol_d_min, _ = _bounds_spreadreduce_slp(opt_w, objective)
     else:
         raise RuntimeError(appsim_scenario.objective)
 
     sol_d_avg = _sol_avg(rnd, opt_w, opt_m, objective)
 
-    agent_ids = [i for i in range(opt_m)]
+    # agent_ids = [i for i in range(opt_m)]
+    agent_ids = appsim_scenario.aids
     network = import_object(network_module, network_type)(locals())
 
-    del rnd, i, b_start, b_end, unctrl, b_s, b_e
-    return locdict(locals())
+    # del rnd
+    del i, b_start, b_end, b_s, b_e, appsim_scenario
+    ld = locdict(locals())
+    del ld['rnd']
+    return ld
 
 
 def ids(m, n):

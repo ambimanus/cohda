@@ -21,10 +21,12 @@ KW_OPT_Q = 'opt_q'						# number of dimensions
 KW_OPT_S = 'opt_s'						# number of instances
 KW_OPT_H = 'opt_h'						# instance
 KW_OPT_W = 'opt_w'						# weights
+KW_OPT_W_DICT = 'opt_w_dict'            # weights (dictionary)
 KW_SOL_D_MIN = 'sol_d_min'              # rating of sum of minimal weights
 KW_SOL_D_MAX = 'sol_d_max'              # rating of sum of maximal weights
 KW_SOL_D_AVG = 'sol_d_avg'              # average rating of sum of randomly chosen indexes
 KW_SOL_INIT = 'sol_init'                # initial opt_w values
+KW_SOL_INIT_DICT = 'sol_init_dict'      # initial opt_w values (dictionary)
 KW_OPT_P_REFUSE = 'opt_p_refuse'        # propability of refusing a candidate solution
 
 KW_SOL = 'sol'							# selected element(s)

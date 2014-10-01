@@ -21,7 +21,7 @@ class Simulator(object):
             a.init(self)
         speaker = (self.cfg.rnd.choice(self.agents.keys())
                    if self.cfg.random_speaker else 0)
-        INFO('Notifying speaker (a%d)' % speaker)
+        INFO('Notifying speaker (a%s)' % speaker)
         objective = self.sc[KW_OBJECTIVE]
         if Stigspace.active:
             for a in self.agents.values():
@@ -70,7 +70,7 @@ class Simulator(object):
     def msg(self, sender, receiver, msg):
         msg_counter()
         delay = self.msgdelay()
-        MSG('a%d --(%d)--> a%d' % (sender, delay, receiver))
+        MSG('a%s --(%d)--> a%s' % (sender, delay, receiver))
         self.messages.append((delay, (receiver, msg)))
 
 
