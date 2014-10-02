@@ -356,7 +356,8 @@ def APPSIM_ENUM(rnd, appsim_scenario, basedir,
         sol_d_max, sol_d_min, _ = _bounds_spreadreduce(opt_w, objective)
     elif appsim_scenario.objective == 'spreadreduce-slp':
         slp = _read_slp_2010(appsim_scenario, basedir)[b_s:b_e]
-        objective = Objective_Spreadreduce_SLP(slp, sol_init.sum(0))
+        objective = Objective_Spreadreduce_SLP(slp,
+                np.array(sol_init_dict.values()).sum(0))
         sol_d_max, sol_d_min, _ = _bounds_spreadreduce_slp(opt_w, objective)
     else:
         raise RuntimeError(appsim_scenario.objective)
