@@ -302,7 +302,7 @@ def APPSIM_ENUM(rnd, appsim_scenario, basedir,
                              np.max(np.max(opt_w, 2), 1)]).T
     opt_q = opt_w.shape[-1]
 
-    b_start = appsim_scenario.t_block_start
+    b_start = appsim_scenario.t_start
     b_end = appsim_scenario.t_block_end
     div = 1
     if (b_end - b_start).total_seconds() / 60 == opt_q * 15:
@@ -337,11 +337,14 @@ def APPSIM_ENUM(rnd, appsim_scenario, basedir,
         raise RuntimeError(opt_sol_init_type)
 
     if appsim_scenario.objective == 'epex':
-        block = np.array(appsim_scenario.block)
+        block = np.ma.array(appsim_scenario.block)
         if block.shape == (1,):
             block = block.repeat(opt_q)
         elif block.shape[0] == opt_q / 15:
             block = block.repeat(15)
+        block_start = (appsim_scenario.t_block_start -
+                       appsim_scenario.t_start).total_seconds() / 60 / div
+        block[:block_start] = np.ma.masked
         objective = Objective_Manhattan(block)
         sol_d_max, sol_d_min, _ = _bounds(opt_w, opt_m, objective,
                                         zerobound=True)
