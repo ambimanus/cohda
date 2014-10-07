@@ -1,11 +1,22 @@
 # coding=utf-8
 
+import signal
 from datetime import datetime as dt
 
 from definitions import *
 from logger import *
 from stigspace import Stigspace
 from util import PBar
+
+
+# Install signal handler for SIGINT
+SIGINT_DETECTED = False
+
+def sigint_detected(signal, frame):
+    global SIGINT_DETECTED
+    SIGINT_DETECTED = True
+
+signal.signal(signal.SIGINT, sigint_detected)
 
 
 class Simulator(object):
@@ -82,6 +93,10 @@ class Simulator(object):
         if (self.cfg.max_simulation_steps and
                 self.current_time >= self.cfg.max_simulation_steps):
             INFO('Stopping (max simulation steps reached)')
+            return False
+        # Check user interrupt
+        if SIGINT_DETECTED:
+            INFO('Stopping due to user request (SIGINT detected)')
             return False
 
         # Check messages
