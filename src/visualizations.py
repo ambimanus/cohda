@@ -156,4 +156,5 @@ class Stats(object):
         if not self.is_converged():
             ERROR('convergence not reached!')
         INFO('Target', self.sc[KW_OBJECTIVE].target)
-        INFO('Result', self.sc[KW_SOL].values()[-1].sum(0))
+        if KW_SOL in self.sc:
+            INFO('Result', self.sc[KW_SOL].values()[-1].sum(0))

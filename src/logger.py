@@ -52,7 +52,7 @@ def setup_logger(cfg, makedir=True, lvl=LOG_LEVEL):
         logging.addLevelName(_LVL_TARGET, _LVL_TARGET_NAME)
         logging.basicConfig(level=lvl, format=FORMAT)
         globals()['_logger'] = logging.getLogger('cohda')
-    else:
+    elif 'filehandler' in globals():
         _logger.removeHandler(filehandler)
 
     globals()['cfg.log_to_file'] = cfg.log_to_file
