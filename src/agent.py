@@ -134,11 +134,12 @@ class Agent():
 
         # AgentGossipBKC
         bkc_f = self.objective(np.array(bkc.values()))
-        AGENTV(self.aid, 'from %s: f(bkc_%s)' % (aid, bkc_creator))
+        AGENTV(self.aid, 'from %s: f(bkc_%s)=%f' % (aid, bkc_creator, bkc_f))
 
         # For bkc vs. self.bkc, there are different cases to consider:
         # 1) given bkc is created by myself
         #       -> do nothing
+        # FIXME: Fall 1 muss auch auf Inhalt/Aktualität des BKC prüfen!?!?!
         # 2) given bkc is larger and all keys from self.bkc are already in
         #    given bkc:
         #       -> replace self.bkc by bkc
@@ -175,6 +176,7 @@ class Agent():
                     self.bkc[k] = bkc[k]
                 self.bkc_creator = self.aid
                 self.bkc_f = self.objective(np.array(self.bkc.values()))
+                AGENTV(self.aid, 'new BKC:', self.bkc)
                 AGENTV(self.aid, 'rating new BKC as', self.bkc_f)
             # Mark myself as dirty
             self.dirty = True
@@ -227,6 +229,7 @@ class Agent():
         # optimize
         current_sol = self.get_current_sol()
         AGENT(self.aid, 'overlayed gossip solution:', current_sol)
+        AGENTV(self.aid, 'own current selection:', self.sol)
         sol, distance = self.choose_solution(current_sol)
         if sol is None:
             AGENT(self.aid, 'no feasible solution candidate found!')
@@ -236,8 +239,9 @@ class Agent():
                 self.notify_peers()
         else:
             AGENT(self.aid, 'solution candidate:', sol, 'with distance', distance)
+            AGENTV(self.aid, '(bkc was:', self.bkc, ' with distance', self.bkc_f, ')')
             if (self.sol_f is None or
-                    (any(sol != self.sol) and
+                    (any(sol != self.bkc[self.aid]) and
                         (len(self.bkc) < len(self.gossip_storage) or
                          distance < self.bkc_f))):
                 # Newly chosen solution will improve BKC rating
@@ -246,7 +250,7 @@ class Agent():
             elif (len(self.bkc) > 0 and
                   any(self.bkc[self.aid] != self.sol)):
                 # Revert to BKC solution
-                AGENTV(self.aid, 'decision: reverting to bkc solution')
+                AGENTV(self.aid, 'decision: reverting to bkc solution (was', self.bkc[self.aid], ')')
                 r = self.objective(current_sol + self.bkc[self.aid])
                 self.set_solution(self.bkc[self.aid], r, new_bkc=False)
             elif len(self.gossip_updates) > 0:

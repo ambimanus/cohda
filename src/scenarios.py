@@ -463,6 +463,15 @@ if __name__ == '__main__':
     sc = SC(random.Random(seed), seed)
 
     print sc
+
+    # nw = sc[KW_NETWORK]
+    # edges = []
+    # for aid in nw.keys():
+    #     for nb in nw[aid]:
+    #         if nb > aid:
+    #             edges.append([aid, nb])
+    # print edges
+
     # print
     # target = sc[KW_OBJECTIVE].target
     # if isinstance(target, np.ma.MaskedArray):
