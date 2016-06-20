@@ -10,7 +10,7 @@ from functools import wraps
 from itertools import izip, ifilter, starmap
 from contextlib import contextmanager
 
-import progressbar.progressbar as pbar
+import progressbar as pbar
 
 
 # http://code.activestate.com/recipes/551763/
