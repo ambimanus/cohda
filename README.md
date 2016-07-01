@@ -4,3 +4,10 @@ In decentralized systems, where the search space of a given optimization problem
 For this purpose, the heuristic [COHDA (Combinatorial Optimization Heuristic for Distributed Agents)](http://www.uni-oldenburg.de/en/computingscience/ui/research/topics/cohda/) was developed. The approach is based on self-organization strategies and yields a distributed combinatorial optimization process in an asynchronous communication environment. Central components for data storage or coordination purposes are not necessary.
 
 I created COHDA as part of my [PhD thesis](http://oops.uni-oldenburg.de/1960/) (in German).
+
+
+## Requirements
+
+- Python 2.7
+- numpy
+- progressbar 2.2 (pip install progressbar==2.2)

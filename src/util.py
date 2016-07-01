@@ -126,28 +126,28 @@ class PBar(pbar.ProgressBar):
 
 
 def get_repo_revision():
-    # import filedbg
-    # filedbg.push()
-    from mercurial import hg, ui, commands
-    ui = ui.ui()
-    repo_path = get_repo_root()
-    repo = hg.repository(ui, repo_path)
-    ui.pushbuffer()
-    commands.identify(ui, repo, rev='.')
-    ret = ui.popbuffer().split()[0]
-    # files = filedbg.pop()
-    # for f in files:
-    #     f.close()
-    return ret
+    repo_path, repo_type = get_repo_root()
+    if repo_type == 'hg':
+        from mercurial import hg, ui, commands
+        ui = ui.ui()
+        repo = hg.repository(ui, repo_path)
+        ui.pushbuffer()
+        commands.identify(ui, repo, rev='.')
+        return ui.popbuffer().split()[0]
+    elif repo_type == 'git':
+        import subprocess
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
 
 
 def get_repo_root():
     path = os.path.dirname(os.path.realpath(__file__))
     while os.path.exists(path):
-        if '.hg' in os.listdir(path):
-            return path
+        if '.git' in os.listdir(path):
+            return path, 'git'
+        elif '.hg' in os.listdir(path):
+            return path, 'hg'
         path = os.path.realpath(os.path.join(path, '..'))
-    raise RuntimeError('No .hg repository found!')
+    raise RuntimeError('No git/hg repository found!')
 
 
 def current_method():

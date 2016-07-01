@@ -1,96 +1,184 @@
 # coding=utf-8
 
-import random
-
 import numpy as np
 
 from logger import *
+from model import Schedule_Selection, Solution_Candidate, Working_Memory
 
 
 class Agent():
-    def __init__(self, aid, opt_w, sol_init, timeout, seed, p_refuse):
-        # ActorMixin
+
+    def __init__(self, aid, search_space, initial_value=None):
+        """Initializes an agent for the COHDA algorithm.
+
+        Arguments:
+        aid -- agent identifier (str)
+        objective -- one-argument objective function (obj --> float)
+        search_space -- search-space (ndarray(2))
+
+        Keyword arguments:
+        initial_value -- initially chosen value (ndarray, default None)
+
+        The initial value will be chosen randomly from the search_space, if
+        None is given.
+        """
         self.aid = aid
-        self.timeout = timeout
-        self.current_timeout = timeout
-        self.rnd = random.Random(seed)
-        self.p_refuse = p_refuse
-        self.dirty = False
-        # PeerMixin
-        self.peers = dict()
-        # MMMSSPMixin
-        self.opt_w = opt_w
-        self.sol_init = sol_init
-        self.sol = sol_init
-        self.sol_f = None
-        self.objective = None
-        # AgentGossip
-        self.sol_counter = 0
-        self.gossip_updates = dict()
-        self.gossip_updates_inbox = dict()
-        self.gossip_storage = dict()
-        # AgentGossipBKC
-        self.bkc = dict()
-        self.bkc_creator = self.aid
-        self.bkc_f = None
+        self.neighbors = dict()
+        self.inbox = []
 
-        self.sim = None
+        self.search_space = search_space
+        if initial_value is None:
+            AGENT('Warning: No initial schedule defined, setting random one.')
+            initial_value = self.rnd.choice(self.search_space)
 
-    def init(self, sim):
-        self.sim = sim
+        schedule_selection = Schedule_Selection(self.aid, initial_value, 0)
+        configuration = {self.aid: schedule_selection}
+        solution_candidate = Solution_Candidate(self.aid, configuration,
+                                                float('inf'))
+        self.kappa = Working_Memory(None, configuration, solution_candidate)
+
+    def init(self, mas):
+        """Sets the multi-agent system, used for messaging."""
+        self.mas = mas
 
     def step(self):
-        if self.current_timeout <= 1:
-            # become active
-            if self.objective is not None and self.dirty:
-                AGENT(self.aid, 'entering run()')
-                self.run()
+        """The agent follows the classical perceive--decide--act behavior."""
+
+        # Termination criterion
+        dirty = False
+
+        # Perceive
+        for msg in self.inbox:
+            sender = msg['sender']
+            # Check message
+            AGENT(self.aid, 'message from %s' % sender)
+            if not sender in self.neighbors:
+                INFO(self.aid,
+                     'Sender (%s) not in neighbours, assuming system message.'
+                     % sender)
+            # Update Zeta (the objective)
+            if self.kappa.objective is None:
+                self.kappa.objective = msg['kappa'].objective
+                dirty = True
+            # Update Omega (the system configuration)
+            omega = msg['kappa'].configuration
+            for aid in omega.keys():
+                if (aid not in self.kappa.configuration or
+                        self.kappa.configuration[aid].v_lambda <
+                        omega[aid].v_lambda):
+                    self.kappa.configuration[aid] = omega[aid]
+                    dirty = True
+            # Update gamma (the solution candidate)
+            gamma_own = self.kappa.solution_candidate
+            gamma_other = msg['kappa'].solution_candidate
+            # There are different cases to consider:
+            # 1) gamma_other is larger and all keys from gamma_own are already
+            #    in gamma_other
+            #       -> replace gamma_own by gamma_other
+            # 2) there is at least one key in gamma_other which is not in
+            #    gamma_own
+            #       -> merge both gammas (TODO: in which direction?)
+            # 3) both gammas have equal keys, but gamma_own has a worse rating
+            #       -> replace gamma_own by gamma_other
+            # 4) both gammas have equal keys and equal rating, but the
+            #    creator-id of gamma_own is larger
+            #       -> replace gamma_own by gamma_other
+            # 5) every other case
+            #    (e.g., gamma_own is larger and no new keys in gamma_other)
+            #       -> do nothing
+            keys_own = set(gamma_own.configuration.keys())
+            keys_other = set(gamma_other.configuration.keys())
+            keys_in = keys_other - keys_own
+            keys_out = keys_own - keys_other
+            assert self.aid not in keys_in
+            if keys_own != keys_other:
+                # Need only process incoming items
+                if len(keys_in) > 0:
+                    if len(keys_out) == 0:
+                        # Case 1: gamma_own is a subset of gamma_other
+                        self.kappa.solution_candidate = gamma_other.copy()
+                    else:
+                        # Case 2: gamma_other is different, import new items
+                        self.kappa.solution_candidate.configuration.update(
+                            {aid: gamma_other.configuration[aid]
+                             for aid in keys_in})
+                    dirty = True
             else:
-                AGENT(self.aid, 'no run() required, going to sleep now.')
-            # reset wait counter
-            self.current_timeout = self.timeout
-        else:
-            # wait
-            self.current_timeout -= 1
+                # We are evaluating a minimization problem here, so 'less' is
+                # 'better'
+                if gamma_own.rating > gamma_other.rating:
+                    # Case 3: gamma_other is better
+                    self.kappa.solution_candidate = gamma_other.copy()
+                    dirty = True
+                elif (gamma_own.rating == gamma_other.rating and
+                      gamma_own.aid > gamma_other.aid):
+                    # Case 4: gammas are equally good, but aid of gamma_other
+                    # is smaller
+                    self.kappa.solution_candidate = gamma_other.copy()
+                    dirty = True
+        self.inbox = []
 
-    def notify_peers(self):
-        AGENTV(self.aid, 'notifying peers')
-        for k in sorted(self.peers.keys()):
-            self.sim.msg(self.aid, k, (self.aid,
-                                       self.objective,
-                                       dict(self.gossip_updates),
-                                       dict(self.bkc),
-                                       self.bkc_creator))
-        AGENTV(self.aid, 'Clearing gossip_updates')
-        self.gossip_updates.clear()
+        # Decide
+        if dirty:
+            # Find best own schedule selection for zeta (the objective) with
+            # respect to Omega (the current system configuration)
+            solution_others = np.array([self.kappa.configuration[aid].schedule
+                                        for aid in self.kappa.configuration
+                                        if aid != self.aid]).sum(axis=0)
+            schedule_best, rating = None, float('inf')
+            for schedule in self.search_space:
+                # Check for feasibility
+                if not self._is_feasible(schedule):
+                    continue
+                # Check for rating
+                r = self.kappa.objective(solution_others + schedule)
+                if schedule is None or r < rating:
+                    schedule_best, rating = schedule, r
+            # TODO: Use search space model or heuristic to select a schedule?
+            # Compare resulting configuration to existing configuration
+            configuration = dict(self.kappa.configuration)
+            configuration[self.aid] = Schedule_Selection(
+                self.aid,
+                schedule_best,
+                self.kappa.configuration[self.aid].v_lambda + 1)
+            if rating < self.kappa.solution_candidate.rating:
+                # Resulting configuration is better, a new solution candidate
+                # has been found.
+                solution_candidate = Solution_Candidate(self.aid,
+                                                        configuration,
+                                                        rating)
+                self.kappa.solution_candidate = solution_candidate
+                self.kappa.configuration = configuration
+            elif np.any(self.kappa.solution_candidate.configuration[self.aid]
+                            .schedule !=
+                        self.kappa.configuration[self.aid].schedule):
+                # Resulting configuration is not better, revert own schedule to
+                # the one from the existing solution candidate.
+                # Attention: Although the same schedule had been selected
+                # somewhere in the past already, this constitutes a new
+                # selection for this agent right now. So the lambda value has
+                # to be increased.
+                self.kappa.configuration[self.aid] = Schedule_Selection(
+                    self.aid,
+                    self.kappa.solution_candidate.configuration[self.aid]
+                        .schedule,
+                    self.kappa.configuration[self.aid].v_lambda + 1)
 
-    def add_peer(self, aid, peer):
-        # Consistency check
-        assert aid != self.aid, 'cannot add myself as peer!'
-        # Store peer
-        if aid not in self.peers.keys():
-            self.peers[aid] = peer
-            AGENTV(self.aid, 'added', aid, 'as peer')
-        else:
-            AGENTV(self.aid, aid, 'is already connected')
+        # Act
+        if dirty:
+            for aid in self.neighbors:
+                self.mas.msg({'sender': self.aid, 'receiver': aid,
+                              'kappa': self.kappa.copy()})
 
-    def choose_solution(self, local_sol):
-        assert self.objective is not None
-        if local_sol is None:
-            local_sol = 0
-        AGENTV(self.aid, 'choose_solution() for local solution:', local_sol)
-        # Find best own solution for given local solution
-        sol, distance = None, None
-        for cand in self.opt_w:
-            if not self.is_feasible(cand):
-                continue
-            d = self.objective(local_sol + cand)
-            if distance is None or d < distance:
-                distance = d
-                sol = cand
-        return sol, distance
+    def set_p_refuse(self, p_refuse, seed):
+        import random
+        self.rnd = random.Random(seed)
+        self.p_refuse = p_refuse
 
-    def is_feasible(self, sol):
+    def _is_feasible(self, sol):
+        # If feasibility check not desired, return immediately:
+        if not hasattr(self, 'rnd'):
+            return True
         # The given solution isn't actually checked for feasibility in this
         # simplified implementation.
         # Instead, accept the solution with a given propability:
@@ -101,196 +189,3 @@ class Agent():
         if not masked and 1 - self.rnd.random() > self.p_refuse:
             return True
         return False
-
-    def update(self, msg):
-        aid, objective, gossip_updates, bkc, bkc_creator = msg
-        AGENT(self.aid, 'update from %s' % aid)
-        # Agent
-        if not aid in self.peers:
-            WARNING(self.aid, 'got update from unknown sender', aid)
-            # return
-
-        # Update objective
-        if (self.objective is None or
-                self.objective.instance < objective.instance):
-            self.notify(objective)
-
-        # AgentGossip
-        AGENT(self.aid, 'receiving gossip_updates_inbox:', gossip_updates)
-        for k, v in gossip_updates.items():
-            if (k != self.aid and
-                    (k not in self.gossip_storage or
-                     self.gossip_storage[k][KW_SOL_COUNTER] <
-                        v[KW_SOL_COUNTER]) and
-                    (k not in self.gossip_updates_inbox or
-                     self.gossip_updates_inbox[k][KW_SOL_COUNTER] <
-                        v[KW_SOL_COUNTER])):
-                AGENTV(self.aid, 'adding', k, 'to gossip_updates_inbox')
-                self.gossip_updates_inbox[k] = v
-                # Mark myself as dirty
-                self.dirty = True
-        AGENT(self.aid, 'updated gossip_updates_inbox:',
-              self.gossip_updates_inbox)
-
-        # AgentGossipBKC
-        bkc_f = self.objective(np.array(bkc.values()))
-        AGENTV(self.aid, 'from %s: f(bkc_%s)=%f' % (aid, bkc_creator, bkc_f))
-
-        # For bkc vs. self.bkc, there are different cases to consider:
-        # 1) given bkc is created by myself
-        #       -> do nothing
-        # FIXME: Fall 1 muss auch auf Inhalt/Aktualität des BKC prüfen!?!?!
-        # 2) given bkc is larger and all keys from self.bkc are already in
-        #    given bkc:
-        #       -> replace self.bkc by bkc
-        # 3) there is at least one key in bkc which is not in self.bkc
-        #       -> merge both bkc's (TODO: in which direction?)
-        # 4) both bkc's have equal keys, but self.bkc has a worse rating
-        #       -> replace self.bkc by bkc
-        # 5) both bkc's have equal keys and equal rating, but the creator-id of
-        #    self.bkc is larger
-        #       -> replace self.bkc by bkc
-        # 6) every other case
-        #    (i.e.: self.bkc is larger and no new keys in given bkc)
-        #       -> do nothing
-        set_own, set_other = set(self.bkc.keys()), set(bkc.keys())
-        in_keys = set_other - set_own
-        out_keys = set_own - set_other
-        if bkc_creator == self.aid:
-            # Case 1: do nothing
-            AGENTV(self.aid, 'given bkc was created by myself --> ignore it')
-            pass
-        elif len(in_keys) > 0:
-            assert self.aid not in in_keys  # this should not happen
-            if len(out_keys) == 0:
-                # Case 2: replace bkc
-                AGENTV(self.aid, 'replacing BKC')
-                self.bkc = bkc
-                self.bkc_f = bkc_f
-                self.bkc_creator = bkc_creator
-            else:
-                # Case 3: merge bkc
-                AGENTV(self.aid, 'keys are different, updating BKC')
-                # Add every newly discovered item in bkc to self.bkc
-                for k in in_keys:
-                    self.bkc[k] = bkc[k]
-                self.bkc_creator = self.aid
-                self.bkc_f = self.objective(np.array(self.bkc.values()))
-                AGENTV(self.aid, 'new BKC:', self.bkc)
-                AGENTV(self.aid, 'rating new BKC as', self.bkc_f)
-            # Mark myself as dirty
-            self.dirty = True
-        elif set_own == set_other:
-            AGENTV(self.aid, 'keys are equal, compare BKC ratings: given bkc_f =',
-                   bkc_f, 'by', bkc_creator, ', self.bkc_f =', self.bkc_f,
-                   'by', self.bkc_creator)
-            if (self.bkc_f > bkc_f or
-                    (self.bkc_f == bkc_f and self.bkc_creator > bkc_creator)):
-                # Cases 4 + 5: replace bkc
-                AGENT(self.aid, 'replacing BKC')
-                self.bkc = bkc
-                self.bkc_f = bkc_f
-                self.bkc_creator = bkc_creator
-                # Mark myself as dirty
-                self.dirty = True
-        else:
-            AGENTV(self.aid, 'default case: self.bkc has', self.bkc.keys(),
-                   'f =', self.bkc_f, ', given bkc has', bkc.keys(), 'f =',
-                   bkc_f)
-        AGENTV(self.aid, 'dirty =', self.dirty)
-
-    def notify(self, objective):
-        self.objective = objective
-        AGENT(self.aid, 'notify() - got new objective')
-        # Mark myself as dirty
-        self.dirty = True
-        # Calculate initial ratings etc.
-        current_sol = self.get_current_sol()
-        rating = self.objective(current_sol + self.sol)
-        self.sol_f = rating
-        self.new_bkc(self.sol, rating)
-        # Prepare first gossip_updates
-        self.gossip_updates[self.aid] = dict()
-        self.gossip_updates[self.aid][KW_SOL] = self.sol
-        self.gossip_updates[self.aid][KW_SOL_COUNTER] = self.sol_counter
-        AGENTV(self.aid, 'initialized gossip_updates:', self.gossip_updates)
-        # AgentGossipBKC
-        if len(self.bkc) > 0:
-            # Recalculate bkc_f
-            self.bkc_f = self.objective(np.array(self.bkc.values()))
-
-    def run(self):
-        AGENT(self.aid, 'run')
-        self.dirty = False
-        # update knowledge
-        self.gossip_storage.update(self.gossip_updates_inbox)
-        self.gossip_updates.update(self.gossip_updates_inbox)
-        self.gossip_updates_inbox.clear()
-        # optimize
-        current_sol = self.get_current_sol()
-        AGENT(self.aid, 'overlayed gossip solution:', current_sol)
-        AGENTV(self.aid, 'own current selection:', self.sol)
-        sol, distance = self.choose_solution(current_sol)
-        if sol is None:
-            AGENT(self.aid, 'no feasible solution candidate found!')
-            if len(self.gossip_updates) > 0:
-                # Do nothing, just publish gossip updates
-                AGENT(self.aid, 'sending gossip updates:', self.gossip_updates)
-                self.notify_peers()
-        else:
-            AGENT(self.aid, 'solution candidate:', sol, 'with distance', distance)
-            AGENTV(self.aid, '(bkc was:', self.bkc, ' with distance', self.bkc_f, ')')
-            if (self.sol_f is None or
-                    (any(sol != self.bkc[self.aid]) and
-                        (len(self.bkc) < len(self.gossip_storage) or
-                         distance < self.bkc_f))):
-                # Newly chosen solution will improve BKC rating
-                AGENTV(self.aid, 'decision: new solution, new bkc')
-                self.set_solution(sol, distance)
-            elif (len(self.bkc) > 0 and
-                  any(self.bkc[self.aid] != self.sol)):
-                # Revert to BKC solution
-                AGENTV(self.aid, 'decision: reverting to bkc solution (was', self.bkc[self.aid], ')')
-                r = self.objective(current_sol + self.bkc[self.aid])
-                self.set_solution(self.bkc[self.aid], r, new_bkc=False)
-            elif len(self.gossip_updates) > 0:
-                # Do nothing, just publish gossip updates
-                AGENT(self.aid, 'decision: just sending gossip updates:', self.gossip_updates)
-                self.notify_peers()
-        AGENTV(self.aid, 'run finished, sol = %s, bkc = %s' % (self.sol, self.bkc))
-
-    def get_current_sol(self):
-        # Overlay known solutions from gossiping
-        current_sol = np.zeros(len(self.objective.target))
-        assert self.aid not in self.gossip_storage
-        for k, v in self.gossip_storage.items():
-            current_sol += v[KW_SOL]
-        return current_sol
-
-    def set_solution(self, sol, rating, new_bkc=True):
-        self.sol_counter += 1
-        # AgentGossipBKC
-        if new_bkc:
-            self.new_bkc(sol, rating)
-        # AgentGossip
-        if self.aid not in self.gossip_updates:
-            self.gossip_updates[self.aid] = dict()
-        self.gossip_updates[self.aid][KW_SOL] = sol
-        self.gossip_updates[self.aid][KW_SOL_COUNTER] = self.sol_counter
-        AGENT(self.aid, 'sending gossip updates:', self.gossip_updates)
-        # Agent
-        self.sol = sol
-        self.sol_f = rating
-        AGENT(self.aid, 'choosing solution:', self.sol)
-        if len(self.peers) > 0:
-            self.notify_peers()
-
-    def new_bkc(self, sol, rating):
-        d = dict()
-        for k in self.gossip_storage:
-            d[k] = self.gossip_storage[k][KW_SOL]
-        d[self.aid] = sol
-        self.bkc_creator = self.aid
-        self.bkc = d
-        self.bkc_f = rating
-        AGENT(self.aid, 'created new BKC with rating', rating)

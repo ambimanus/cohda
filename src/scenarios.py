@@ -2,6 +2,7 @@
 
 from __future__ import division
 
+import sys
 import os
 import csv
 from datetime import datetime
@@ -113,8 +114,18 @@ def _bounds(opt_w, opt_m, objective, zerobound=True):
     return sol_d_max, sol_d_min, sol_j_max
 
 
-def _bounds_bruteforce(h, n, m):
-    d = np.load('../sc_data/bruteforce_h%03d.npy' % h)
+def _bounds_bruteforce(h, n, m, w, obj):
+    path = os.path.dirname(os.path.realpath(__file__))
+    fn = '%s/../sc_data/bruteforce_h%03d.npy' % (path, h)
+    print fn
+    if os.path.exists(fn):
+        d = np.load(fn)
+    else:
+        print 'Bruteforce results file not found, calculating now.'
+        print '(You can store the results, see %s.%s)' % current_method()
+        results = bruteforce({KW_OPT_M: m, KW_OPT_N: n, KW_OPT_W: w,
+                              KW_OBJECTIVE: obj})
+        # np.save(fn, results)
     imin, imax = np.argmin(d), np.argmax(d)
     vmin, vmax = d.min(), d.max()
     conv = base10toN(imax, n)
@@ -189,7 +200,8 @@ def SC(rnd, seed,
         raise RuntimeError(opt_p_refuse_type)
 
     if opt_m == 10 and opt_n == 5 and opt_q == 5:
-        sol_d_max, sol_d_min, sol_j_max = _bounds_bruteforce(opt_h, opt_n, opt_m)
+        sol_d_max, sol_d_min, sol_j_max = _bounds_bruteforce(opt_h, opt_n,
+                opt_m, opt_w, objective)
     else:
         sol_d_max, sol_d_min, sol_j_max = _bounds(opt_w, opt_m, objective)
 
@@ -392,6 +404,16 @@ def ids(m, n):
 
 
 def bruteforce(sc, progress=True, thres=None):
+    # Install signal handler for SIGINT
+    import signal
+
+    def sigint_detected(signal, frame):
+        print 'Stopping due to user request (SIGINT detected).'
+        sys.exit(1)
+
+    signal.signal(signal.SIGINT, sigint_detected)
+    print 'Cancel with Ctrl-C (i.e., SIGINT).'
+
     # print
     # print 'brute force'
 

@@ -7,10 +7,12 @@ from definitions import *
 from logger import *
 from stigspace import Stigspace
 from util import PBar
+from model import Working_Memory, Solution_Candidate
 
 
 # Install signal handler for SIGINT
 SIGINT_DETECTED = False
+
 
 def sigint_detected(signal, frame):
     global SIGINT_DETECTED
@@ -26,21 +28,23 @@ class Simulator(object):
         self.agents = agents
         self.current_time = 0
         self.messages = []
+        self.agent_delays = {aid: 0 for aid in self.agents}
 
     def init(self):
         for a in self.agents.values():
             a.init(self)
-        speaker = (self.cfg.rnd.choice(self.agents.keys())
-                   if self.cfg.random_speaker else 0)
-        INFO('Notifying speaker (a%s)' % speaker)
-        objective = self.sc[KW_OBJECTIVE]
+        kappa = Working_Memory(self.sc[KW_OBJECTIVE], dict(),
+                               Solution_Candidate(None, dict(), float('inf')))
+        msg = {'sender': 'mas', 'kappa': kappa}
         if Stigspace.active:
             for a in self.agents.values():
-                a.notify(objective)
+                a.inbox.append(msg)
         else:
-            self.agents[speaker].notify(objective)
-        objective._reset_call_counter()
-
+            speaker = (self.cfg.rnd.choice(self.agents.keys())
+                       if self.cfg.random_speaker else 0)
+            INFO('Notifying speaker (a%s)' % speaker)
+            self.agents[speaker].inbox.append(msg)
+        # objective._reset_call_counter()
 
     def step(self):
         ts = dt.now()
@@ -52,7 +56,7 @@ class Simulator(object):
         delayed_messages = []
         for delay, msg in self.messages:
             if delay <= 1:
-                self.agents[msg[0]].update(msg[1])
+                self.agents[msg['receiver']].inbox.append(msg)
             else:
                 delayed_messages.append((delay - 1, msg))
             counter += 1
@@ -63,8 +67,14 @@ class Simulator(object):
         self.messages = delayed_messages
 
         # activate agents
-        for a in self.agents.values():
-            a.step()
+        for aid in self.agents:
+            a = self.agents[aid]
+            delay = self.agent_delays[aid]
+            if delay <= 1:
+                a.step()
+                self.agent_delays[aid] = self.agentdelay()
+            else:
+                self.agent_delays[aid] = delay - 1
             counter += 1
             if progress is None and (dt.now() - ts).seconds >= 1:
                 progress = PBar(amount).start()
@@ -72,18 +82,19 @@ class Simulator(object):
                 progress.update(counter)
         self.current_time += 1
 
-
     def msgdelay(self):
         return self.cfg.rnd.randint(self.cfg.msg_delay_min,
                                     self.cfg.msg_delay_max)
 
+    def agentdelay(self):
+        return self.cfg.rnd.randint(self.cfg.agent_delay_min,
+                                    self.cfg.agent_delay_max)
 
-    def msg(self, sender, receiver, msg):
+    def msg(self, msg):
         msg_counter()
         delay = self.msgdelay()
-        MSG('a%s --(%d)--> a%s' % (sender, delay, receiver))
-        self.messages.append((delay, (receiver, msg)))
-
+        MSG('a%s --(%d)--> a%s' % (msg['sender'], delay, msg['receiver']))
+        self.messages.append((delay, msg))
 
     def is_active(self):
         # Check maximal runtime
@@ -105,7 +116,7 @@ class Simulator(object):
 
         # Check agent activity
         for a in self.agents.values():
-            if a.dirty:
+            if len(a.inbox) > 0:
                 return True
 
         INFO('Stopping (no activity)')

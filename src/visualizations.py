@@ -10,18 +10,24 @@ from logger import *
 import util
 
 
+def schedule_selection(agent):
+    return agent.kappa.configuration[agent.aid]
+
+
 class Stats(object):
     def __init__(self, scenario, agents):
         self.sc = scenario
         self.agents = agents
-        self.solution = {aid: agents[aid].sol for aid in agents}
-        self.sol_counters = {aid: agents[aid].sol_counter for aid in agents}
+        self.solution = {aid: schedule_selection(agents[aid]).schedule
+                         for aid in agents}
+        self.sol_counters = {aid: schedule_selection(agents[aid]).v_lambda
+                             for aid in agents}
         self.bkc_sizes = {}
         self.bkc_ratings = {}
         self.first_time = True
         self.new_solution = False
         self.distance = 1.0
-        self.bkcmin = 1.0
+        self.bkcmin = float('inf')
         self.bkcmin_dist = 0.0
         self.bkcmin_size = 0.0
         self.sel = None
@@ -38,14 +44,13 @@ class Stats(object):
         # Collect agent states
         for aid in sorted(self.agents.keys()):
             a = self.agents[aid]
-            if self.sol_counters[aid] != a.sol_counter:
-                self.sol_counters[aid] = a.sol_counter
-                self.solution[aid] = a.sol
+            if self.sol_counters[aid] != schedule_selection(a).v_lambda:
+                self.sol_counters[aid] = schedule_selection(a).v_lambda
+                self.solution[aid] = schedule_selection(a).schedule
                 self.new_solution = True
-            if a.bkc is not None:
-                self.bkc_sizes[aid] = len(a.bkc)
-            if a.bkc_f is not None:
-                self.bkc_ratings[aid] = a.bkc_f
+            if a.kappa.solution_candidate is not None:
+                self.bkc_sizes[aid] = len(a.kappa.solution_candidate.configuration)
+                self.bkc_ratings[aid] = a.kappa.solution_candidate.rating
 
         # Set current timestamp relative to beginning of the heuristic
         current_time -= self.time_delta
@@ -73,10 +78,10 @@ class Stats(object):
             # bkcmin_dist := distribution of minimal bkc in population
             bkcmin_dist = len(eq) / opt_m
             # bkcmin_size := completeness of minimal bkc with respect to opt_m
-            bkcmin_size = None
+            bkcmin_size = 0.0
             for k in eq:
                 s = self.bkc_sizes[k]
-                if bkcmin_size is None or s > bkcmin_size:
+                if s > bkcmin_size:
                     bkcmin_size = s
             bkcmin_size = bkcmin_size / opt_m
             # Sanity check:
@@ -147,7 +152,8 @@ class Stats(object):
         if self.bkcmin_dist != 1.0:
             return False
         for a in self.agents.values():
-            if any(a.sol != a.bkc[a.aid]):
+            bkc = a.kappa.solution_candidate.configuration
+            if any(schedule_selection(a).schedule != bkc[a.aid].schedule):
                 return False
         return True
 

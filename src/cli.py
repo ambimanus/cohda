@@ -32,8 +32,6 @@ def run(cfg):
     agents = dict()
     Agent = import_object(sc[KW_AGENT_MODULE], sc[KW_AGENT_TYPE])
     for i, aid in enumerate(sc[KW_AGENT_IDS]):
-        # Determine seed for MOCOMixin
-        seed = cfg.rnd.randint(0, cfg.rng_seed_max)
         # Get weights
         if KW_OPT_W_DICT in sc:
             w = sc[KW_OPT_W_DICT][aid]
@@ -45,9 +43,11 @@ def run(cfg):
         else:
             sol_init = sc[KW_SOL_INIT][i]
         # Start agent process
-        a = Agent(aid, w, sol_init,
-            cfg.rnd.randint(cfg.agent_delay_min, cfg.agent_delay_max),
-            seed, sc[KW_OPT_P_REFUSE][i])
+        a = Agent(aid, w, sol_init)
+        # If desired, set p_refuse and seed for feasibility check
+        if KW_OPT_P_REFUSE in sc and sc[KW_OPT_P_REFUSE][i] > 0:
+            seed = cfg.rnd.randint(0, cfg.rng_seed_max)
+            a.set_p_refuse(sc[KW_OPT_P_REFUSE][i], seed)
         if 'Stigspace' in sc[KW_AGENT_TYPE]:
             Stigspace.set_active(True)
         agents[aid] = a
@@ -55,8 +55,14 @@ def run(cfg):
     INFO('Connecting agents')
     for a, neighbors in sc[KW_NETWORK].items():
         for n in neighbors:
-            DEBUG('', 'Connecting', n, '->', a)
-            agents[a].add_peer(n, agents[n])
+            # Consistency check
+            assert a != n, 'cannot add myself as neighbor!'
+            # Add neighbor
+            DEBUG('', 'Connecting', a, '->', n)
+            if n not in agents[a].neighbors:
+                agents[a].neighbors[n] = agents[n]
+            else:
+                WARNING(n, 'is already neighbor of', a)
 
     sim = Simulator(cfg, agents)
 
@@ -87,7 +93,7 @@ if __name__ == '__main__':
         agent_delay_max=None,
         log_to_file=False,
     )
-    sc = scenarios.SC(cfg.rnd, cfg.seed, opt_h='random')
+    sc = scenarios.SC(cfg.rnd, cfg.seed, opt_h=5)
     # sc = scenarios.SVSM(cfg.rnd, cfg.seed)
     # sc = scenarios.CHP(cfg.rnd, cfg.seed, opt_m=10, opt_n=400, opt_q=16, opt_q_constant=20.0)
     #
