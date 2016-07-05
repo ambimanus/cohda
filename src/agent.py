@@ -13,7 +13,6 @@ class Agent():
 
         Arguments:
         aid -- agent identifier (str)
-        objective -- one-argument objective function (obj --> float)
         search_space -- search-space (ndarray(2))
 
         Keyword arguments:
