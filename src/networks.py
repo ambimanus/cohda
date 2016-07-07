@@ -4,19 +4,17 @@ from __future__ import division
 
 from collections import OrderedDict as dict
 
-from definitions import *
-
 
 def unconnected(params, network=None):
-    return dict({n: list() for n in params[KW_AGENT_IDS]})
+    return dict({n: list() for n in params.agent_ids})
 
 
 def sequence(params, network=None):
-    ids = params[KW_AGENT_IDS]
+    ids = params.agent_ids
     if network is None:
         network = dict({n: list() for n in ids})
     for i in range(len(ids)):
-        for k in range(1, params[KW_NETWORK_K] + 1):
+        for k in range(1, params.network_k + 1):
             if i + k < len(ids):
                 network[ids[i]].append(ids[i + k])
                 network[ids[i + k]].append(ids[i])
@@ -24,29 +22,19 @@ def sequence(params, network=None):
 
 
 def ring(params, network=None):
-    ids = params[KW_AGENT_IDS]
+    ids = params.agent_ids
     if network is None:
         network = dict({n: list() for n in ids})
     for i in range(len(ids)):
-        for k in range(1, min(len(ids), params[KW_NETWORK_K] + 1)):
+        for k in range(1, min(len(ids), params.network_k + 1)):
             node = (i + k) % len(ids)
             network[ids[i]].append(ids[node])
             network[ids[node]].append(ids[i])
     return network
 
 
-def stigspace(params, network=None):
-    ids = params[KW_AGENT_IDS]
-    if network is None:
-        network = dict({n: list() for n in ids})
-    # Directed ring with k=1
-    for i in range(len(ids)):
-        network[ids[i]].append(ids[(i + 1) % len(ids)])
-    return network
-
-
 def full(params, network=None):
-    ids = params[KW_AGENT_IDS]
+    ids = params.agent_ids
     if network is None:
         network = dict()
     for i in range(len(ids)):
@@ -55,7 +43,7 @@ def full(params, network=None):
 
 
 def half(params, network=None):
-    ids = params[KW_AGENT_IDS]
+    ids = params.agent_ids
     if network is None:
         network = dict({n: list() for n in ids})
     for n1 in ids[:len(ids)/2]:
@@ -67,7 +55,7 @@ def half(params, network=None):
 
 def mesh_rect(params, network=None):
     from math import floor, sqrt
-    ids = params[KW_AGENT_IDS]
+    ids = params.agent_ids
     if network is None:
         network = dict()
     s = int(floor(sqrt(len(ids))))
@@ -86,24 +74,21 @@ def mesh_rect(params, network=None):
 
 
 def random(params, network=None):
-    ids, rnd = params[KW_AGENT_IDS], params[KW_RND]
     if network is None:
-        sids = list(ids)
-        rnd.shuffle(sids)
-        par = dict(params)
-        par[KW_AGENT_IDS] = sids
-        network = sequence(par)
-    c = params[KW_NETWORK_C]
-    for n in ids:
-        if len(network[n]) >= c:
+        ids_bak = list(params.agent_ids)
+        params.rnd.shuffle(params.agent_ids)
+        network = sequence(params)
+        params.agent_ids = ids_bak
+    for n in params.agent_ids:
+        if len(network[n]) >= params.network_c:
             continue
-        cand = list(ids)
-        rnd.shuffle(cand)
+        cand = list(params.agent_ids)
+        params.rnd.shuffle(cand)
         for cnd in cand:
-            if len(network[n]) >= c:
+            if len(network[n]) >= params.network_c:
                 break
             if (cnd == n or cnd in network[n] or
-                    len(network[cnd]) >= c):
+                    len(network[cnd]) >= params.network_c):
                 continue
             network[n].append(cnd)
             network[cnd].append(n)
@@ -114,11 +99,10 @@ def smallworld(params, network=None):
     # First create a k-neighbour-ring
     network = ring(params, network=network)
     # Create len(ids)*k*phi random shortcuts
-    ids, k, phi = params[KW_AGENT_IDS], params[KW_NETWORK_K], params[KW_NETWORK_PHI]
+    ids, k, phi = params.agent_ids, params.network_k, params.network_phi
     for i in range(int(len(ids) * k * phi)):
-        subset = params[KW_RND].sample(ids, 2)
+        subset = params.rnd.sample(ids, 2)
         if not subset[1] in network[subset[0]]:
             network[subset[0]].append(subset[1])
             network[subset[1]].append(subset[0])
     return network
-

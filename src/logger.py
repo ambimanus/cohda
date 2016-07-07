@@ -7,8 +7,7 @@ import pickle
 import time
 import random
 
-from definitions import *
-from objectives import Objective
+from util import get_repo_revision
 
 FORMAT = '[%(levelname)-9s] %(message)s'
 
@@ -35,13 +34,8 @@ FILTER_LVL = None
 #FILTER_LVL = _LVL_SOLUTION
 
 
-def setup_logger(cfg, makedir=True, lvl=LOG_LEVEL):
-    from util import get_repo_revision
-
-    if hasattr(cfg, 'basepath'):
-        basepath = cfg.basepath
-    else:
-        basepath = '../data'
+def setup(sc, makedir=True, lvl=LOG_LEVEL):
+    basepath = sc.log_basepath
 
     if not '_logger' in globals():
         logging.addLevelName(_LVL_MSG, _LVL_MSG_NAME)
@@ -55,67 +49,62 @@ def setup_logger(cfg, makedir=True, lvl=LOG_LEVEL):
     elif 'filehandler' in globals():
         _logger.removeHandler(filehandler)
 
-    globals()['cfg.log_to_file'] = cfg.log_to_file
-    if cfg.log_to_file:
+    globals()['sc.log_to_file'] = sc.log_to_file
+    if sc.log_to_file:
 
         if makedir:
             ts = datetime.datetime.now().isoformat().split('T')[0]
             globals()['rev'] = get_repo_revision()
-            globals()['dirname'] = '_'.join((ts, str(cfg.scenario[KW_TITLE]), rev))
-            globals()['dir'] = str(os.path.join(basepath, dirname))
-            if not os.path.exists(dir):
+            globals()['dirname'] = '_'.join((ts, str(sc.title), rev))
+            globals()['logdir'] = str(os.path.join(basepath, dirname))
+            if not os.path.exists(logdir):
                 try:
-                    os.makedirs(dir)
+                    os.makedirs(logdir)
                 except:
                     pass
             # try again after a short sleep
             time.sleep(random.random())
-            if not os.path.exists(dir):
+            if not os.path.exists(logdir):
                 try:
-                    os.makedirs(dir)
+                    os.makedirs(logdir)
                 except:
                     raise RuntimeError('Cannot create directory')
         else:
-            globals()['dir'] = basepath
+            globals()['logdir'] = basepath
 
-
-        filename = '.'.join((str(cfg.seed), 'log'))
-        file = str(os.path.join(dir, filename))
-        if os.path.exists(file):
-            raise RuntimeError('Logfile already exists: %s' % file)
-        globals()['filehandler'] = logging.FileHandler(file, mode='w')
+        filename = '.'.join((str(sc.seed), 'log'))
+        f = str(os.path.join(logdir, filename))
+        if os.path.exists(f):
+            raise RuntimeError('Logfile already exists: %s' % f)
+        globals()['filehandler'] = logging.FileHandler(f, mode='w')
         filehandler.setFormatter(logging.Formatter(fmt=FORMAT))
         _logger.addHandler(filehandler)
 
-    globals()['message_counter'] = 0
+    globals()['scenario'] = sc
     globals()['first_time'] = True
 
 
-def reset_message_counter():
-    globals()['message_counter'] = 0
+def set_mas(mas):
+    globals()['mas'] = mas
 
 
-def msg_counter():
-    globals()['message_counter'] += 1
-
-
-def store_cfg(cfg, overwrite=False):
-    if cfg.log_to_file:
-        cfgfilepath = str(os.path.join(dir, '.'.join(('cfg', str(cfg.seed),
-                'pickle'))))
-        if os.path.exists(cfgfilepath):
+def store_scenario(sc, overwrite=False):
+    if sc.log_to_file:
+        scfilepath = str(os.path.join(logdir, '.'.join(
+            ('scenario', str(sc.seed), 'pickle'))))
+        if os.path.exists(scfilepath):
             if overwrite:
-                os.remove(cfgfilepath)
+                os.remove(scfilepath)
             else:
-                print 'WARNING: cfg already exists!!'
-        with open(cfgfilepath, 'w') as cfgfile:
-            pickle.dump(cfg, cfgfile)
+                print 'WARNING: scenario file already exists!!'
+        with open(scfilepath, 'w') as scfile:
+            pickle.dump(sc, scfile)
 
 
 def log(lvl, *msg):
     message = _string(*msg)
     if (lvl == FILTER_LVL or
-            FILTER == None or any([True for f in FILTER if f in message])):
+            FILTER is None or any([True for f in FILTER if f in message])):
         _logger.log(lvl, message)
 
 
@@ -124,14 +113,18 @@ def _string(*msg):
         out = '  msg |   obj | '
         globals()['first_time'] = False
     else:
-        out = '%5d | %5d | ' % (message_counter, Objective.calls)
+        message_counter = 0
+        if 'mas' in globals():
+            message_counter = mas.message_counter
+        objective_counter = scenario.objective.call_counter
+        out = '%5d | %5d | ' % (message_counter, objective_counter)
     if len(msg) > 1:
         if type(msg[0] == int or (type(msg[0] == str and len(msg[0]) > 0))):
             sep = ' | '
         else:
             sep = ' '
         if type(msg[0]) == int:
-            out += 'a%d' % msg[0] + sep
+            out += '%d' % msg[0] + sep
         else:
             out += str(msg[0]) + sep
         msg = msg[1:]
