@@ -41,7 +41,7 @@ class SC(object):
                  opt_h=5,                       # capacity selector (no. of instance)
                  ):
         self.rnd = random.Random(sim_seed)
-        np.random.seed(int(random.getrandbits(32)))
+        np.random.seed(int(self.rnd.getrandbits(32)))
 
         self.sim_msg_delay_min = max(1, self.sim_msg_delay_min)
         self.sim_msg_delay_max = max(self.sim_msg_delay_min,
